@@ -1,4 +1,6 @@
-(ns ParadigmsOfAIProgramming.core)
+(ns ParadigmsOfAIProgramming.core
+  (use [clojure.set])
+  (use [clojure.pprint]))
 
 ;Chapter 2: A simple Lisp Programm
 ;A strait forword solution
@@ -36,7 +38,7 @@
 (defn generate
   "Generat a random sentence or phrase"
   [grammer phrase]
-  (println "phrase " phrase)
+  #_(println "phrase " phrase)
   (cond  (list? phrase) (apply concat (map (partial generate grammer) phrase))
          (seq (rewrites grammer phrase))
          (generate grammer (rand-nth (rewrites grammer phrase)))
@@ -114,13 +116,13 @@
        (methods* -> () (methods_ methods*))
        (methods_ -> getter setter IOmetod)
        "Grammer of a liddle OO language"))
-x
+
 (defn class-generat [phrase]
   (generate *class-grammer* phrase))
 
 ;Exersise 2.4
 (defn cross-product [f xcoll ycoll]
-  (apply concat (map (fn [y] (map (fn [x] (f x y)) xcoll)) ycoll)))
+  (mapcat (fn [y] (map (fn [x] (f x y)) xcoll)) ycoll))
 
 (defn combine-all [xlist ylist]
   (cross-product concat xlist ylist))
@@ -129,4 +131,104 @@ x
 
 (defn remove= [item coll]
   (remove (partial = item) coll))
+
+(defn find-all2 [item coll pred]
+  (remove (complement (partial pred item)) coll))
+
+
+; http://groups.google.com/group/clojure/browse_thread/thread/d4ccbfe2a62c827f
+(defn find-all [item coll & {:keys [test test-not] :or {test =}}] 
+  (if test-not 
+    (remove #(test-not item %) coll) 
+    (filter #(test item %) coll))) 
+
+;writen by me
+(defn my-member [item coll]
+  (loop [coll coll]
+    (when coll
+      (if (= item (first coll))
+       coll
+       (recur (next coll))))))
+
+;from the nice #clojure channel
+(defn member [item coll]
+  (drop-while (complement #{item}) coll))
+
+; 4 .GPS
+
+; 4.2 Specification
+
+ ;- since clojure has set I hope that helps me. 
+ ;   - a condition is a symbol  
+ ;      - CL -> (rich famous) (unknown poor)
+ ;      - Clojure -> #{rich famous} #{unknown poor}
+
+ ; List of poerators witch is consisten for a problem
+ ; I am going to take atom here because we will have tocange it
+
+ ; (GPS #{rich famous} #{unknow poor} list-of-ops)
+;implementation
+
+(def *ops* (atom [])) 
+(def *state* (atom #{}))
+
+(defrecord op [action preconds add-list del-list])
+
+(defn appropriate? [goal op]
+  "An op is appropriate to a goal if it is in its add list"
+  (some #{goal} (:add-list op)))
+
+(defn achived? [goal]
+  (or (some #{goal} *state*)
+      (some apply-op (find-all goal *ops* :test appropriate?))))
+
+(defn apply-op [op]
+  (when (every? achived? (:preconds op))
+    #_(println (str "(Exectuting " (:action op) ")"))
+    (swap! *state* (difference @*state* (:del-list op)))
+    (swap! *state* (union @*state* (:add-list op)))
+    true))
+
+(defn GPS [goals state op]
+  (reset! *state* state)
+  (reset! *ops* op)
+  (let [re (if (every? achived? goals) "solved")]
+    (reset! *state* [])
+    (reset! *ops* [])
+    re))
+
+;wwww.norvig.com/paip/gps1.lisp
+;;action preconds add-list del-list
+
+(def *school-ops*
+     [(op. 'drive-son-to-school
+           #{'son-at-home 'car-works}
+           #{'son-at-school}
+           #{'son-at-home})
+      (op. 'shop-installs-battery
+           #{'car-needs-battery 'shop-knows-problem 'shop-has-money}
+           #{'car-works}
+           nil)
+      (op. 'tell-shop-problem
+           #{'in-communication-with-shop}
+           #{'shop-knows-problem}
+           nil)
+      (op. 'telephone-shop
+           #{'know-phone-number}
+           #{'in-communication-with-shop}
+           nil)
+      (op. 'look-up-number
+           #{'have-phone-book}
+           #{'know-phone-number}
+           nil)
+      (op. 'give-shop-money
+           #{'have-money}
+           #{'shop-has-money}
+           #{'have-money})])
+
+;; TEST Function for the GPS
+(GPS #{'son-at-home 'car-works} '(son-at-school) *school-ops*)
+(GPS #{'son-at-home 'car-needs-battery 'have-money 'have-phone-book}
+        '(son-at-school)
+        *school-ops*)
 
