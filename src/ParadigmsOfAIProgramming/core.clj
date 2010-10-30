@@ -178,18 +178,19 @@
   "An op is appropriate to a goal if it is in its add list"
   (some #{goal} (:add-list op)))
 
+(def apply-op nil)
+
 (defn achived? [goal]
-  (or (some #{goal} *state*)
-      (some apply-op (find-all goal *ops* :test appropriate?))))
+  (or (some #{goal} @*state*)
+      (some apply-op (find-all goal @*ops* :test appropriate?))))
 
 (defn apply-op [op]
   (when (every? achived? (:preconds op))
-    #_(println (str "(Exectuting " (:action op) ")"))
-    (swap! *state* (difference @*state* (:del-list op)))
-    (swap! *state* (union @*state* (:add-list op)))
+    (swap! *state* difference (:del-list op))
+    (swap! *state* union (:add-list op))
     true))
 
-(defn GPS [goals state op]
+(defn GPS [state goals op]
   (reset! *state* state)
   (reset! *ops* op)
   (let [re (if (every? achived? goals) "solved")]
